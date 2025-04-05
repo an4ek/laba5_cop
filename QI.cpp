@@ -61,13 +61,14 @@ public:
         return ++m_cRef;
     };
 
+    // Исправленная функция Release
     virtual ULONG _stdcall Release() {
         cout << "CA: Release = " << m_cRef - 1 << endl;
-        if (--m_cRef == 0) {
+        ULONG refCount = --m_cRef; // Уменьшаем счетчик один раз
+        if (refCount == 0) {
             delete this;
-            return 0;
         }
-        return --m_cRef;
+        return refCount; // Возвращаем новое значение счетчика
     };
 private:
     // Счетчик ссылок
