@@ -1,271 +1,242 @@
-﻿#include <iostream>
-#include <unknwn.h>
+﻿#include <cassert>
+#include <iostream>
 #include "QI.h"
-#include <cassert>
-#include "C:\Users\anee4\source\repos\lab5\QI.h"
+#include <unknwn.h>
 
-using namespace std;
 
-// Интерфейсы
-interface IX : IUnknown {
-    virtual void _stdcall Fx() = 0;
+interface IX : public IUnknown {
+    virtual void __stdcall Fx() = 0;
 };
 
-interface IY : IUnknown {
-    virtual void _stdcall Fy() = 0;
+interface IY : public IUnknown {
+    virtual void __stdcall Fy() = 0;
 };
 
-interface IZ : IUnknown {
-    virtual void _stdcall Fz() = 0;
+interface IZ : public IUnknown {
+    virtual void __stdcall Fz() = 0;
 };
 
-// Компонент
 class CA : public IX, public IY {
 public:
 
-    virtual HRESULT _stdcall QueryInterface(const IID& iid, void** ppv) {
+    CA() : m_cRef(0) {}
+
+    ~CA() { std::cout << "CA: destroyed..." << std::endl; };
+
+    virtual ULONG __stdcall AddRef() {
+        std::cout << "CA: AddRef = " << m_cRef + 1 << std::endl;
+        return ++m_cRef;
+    }
+
+    virtual ULONG __stdcall Release() {
+        std::cout << "CA: Release = " << m_cRef - 1 << std::endl;
+        if (--m_cRef == 0) {
+            delete this;
+            return 0;
+        }
+        return m_cRef;
+    }
+
+    virtual HRESULT QueryInterface(const IID& iid, void** ppv) {
         if (iid == IID_IUnknown1) {
-            cout << "QueryInterface: возвращаю указатель на IUnknown" << endl;
+            std::cout << "QueryInterface: return pointer to IUnknown" << std::endl;
             *ppv = static_cast<IX*>(this);
         }
         else if (iid == IID_IX) {
-            cout << "QueryInterface: возвращаю указатель на IX" << endl;
+            std::cout << "QueryInterface: return pointer to IX" << std::endl;
             *ppv = static_cast<IX*>(this);
         }
         else if (iid == IID_IY) {
-            cout << "QueryInterface: возвращаю указатель на IY" << endl;
+            std::cout << "QueryInterface: return pointer to IY" << std::endl;
             *ppv = static_cast<IY*>(this);
         }
         else {
-            cout << "Интерфейс не поддерживается" << endl;
+            std::cout << "Interface not supported" << std::endl;
             *ppv = NULL;
             return E_NOINTERFACE;
         }
         reinterpret_cast<IUnknown*>(*ppv)->AddRef();
         return S_OK;
     }
-    // Конструктор
-    CA() : m_cRef(0) {};
 
-    // Деструктор
-    ~CA() { cout << "CA: destroed..." << endl; };
+    virtual void Fx() { std::cout << "CA::Fx" << std::endl; }
 
-    // Реализация интерфейса IX
-    virtual void _stdcall Fx() { std::cout << "CA::Fx" << std::endl; };
+    virtual void Fy() { std::cout << "CA::Fy" << std::endl; }
 
-    // Реализация интерфейса IY
-    virtual void _stdcall Fy() { std::cout << "CA::Fy" << std::endl; };
-
-    virtual ULONG _stdcall AddRef() {
-        cout << "CA: AddRef = " << m_cRef + 1 << endl;
-        return ++m_cRef;
-    };
-
-    // Исправленная функция Release
-    virtual ULONG _stdcall Release() {
-        cout << "CA: Release = " << m_cRef - 1 << endl;
-        ULONG refCount = --m_cRef; // Уменьшаем счетчик один раз
-        if (refCount == 0) {
-            delete this;
-        }
-        return refCount; // Возвращаем новое значение счетчика
-    };
 private:
-    // Счетчик ссылок
     long m_cRef;
 };
 
-
-// Функция создания компонента
 IUnknown* CreateInstance() {
     IUnknown* pI = static_cast<IX*>(new CA);
     pI->AddRef();
     return pI;
 }
 
-BOOL SameComponents(IX* pIX, IY* pIY)
-{
+BOOL SameComponents(IX* pIX, IY* pIY) {
     IUnknown* pI1 = NULL;
     IUnknown* pI2 = NULL;
 
-    // получить указатели на IUnknown через pIX
     pIX->QueryInterface(IID_IUnknown1, (void**)&pI1);
 
-    // получить указатели на IUnknown через pIY
     pIY->QueryInterface(IID_IUnknown1, (void**)&pI2);
 
-    // сравнить полученные указатели
-    return pI1 == pI2;
+    BOOL result = (pI1 == pI2);
+
+    pI1->Release();
+    pI2->Release();
+
+    return result;
 }
 
-void f(IX* pIX)
-{
+void f(IX* pIX) {
     IX* pIX2 = NULL;
 
-    // Запросить IX через IX
     HRESULT hr = pIX->QueryInterface(IID_IX, (void**)&pIX2);
 
-    assert(SUCCEEDED(hr)); // Запрос должен быть успешным
+    assert(SUCCEEDED(hr));
+    if (pIX2) pIX2->Release();
 }
 
-void f2(IX* pIX)
-{
+void f2(IX* pIX) {
     HRESULT hr;
 
     IX* pIX2 = NULL;
     IY* pIY = NULL;
 
-    // Получить IY через IX
     hr = pIX->QueryInterface(IID_IY, (void**)&pIY);
 
-    if (SUCCEEDED(hr))
-    {
-        // Получить IX через IY
+    if (SUCCEEDED(hr)) {
         hr = pIY->QueryInterface(IID_IX, (void**)&pIX2);
 
-        // QueryInterface должна отработать успешно
         assert(SUCCEEDED(hr));
+        if (pIX2) pIX2->Release();
+        pIY->Release();
     }
 }
 
-void f3(IX* pIX)
-{
+void f3(IX* pIX) {
     HRESULT hr;
+
     IY* pIY = NULL;
 
-    // Запросить IY у IX
     hr = pIX->QueryInterface(IID_IY, (void**)&pIY);
 
-    if (SUCCEEDED(hr))
-    {
+    if (SUCCEEDED(hr)) {
         IZ* pIZ = NULL;
 
-        // Запросить IZ у IY
         hr = pIY->QueryInterface(IID_IZ, (void**)&pIZ);
 
-        if (SUCCEEDED(hr))
-        {
-            // Запросить IZ у IX
+        if (SUCCEEDED(hr)) {
+            pIZ->Release();
+
             hr = pIX->QueryInterface(IID_IZ, (void**)&pIZ);
-            assert(SUCCEEDED(hr)); // Это должно работать
+
+            if (SUCCEEDED(hr)) {
+                pIZ->Release();
+            }
         }
+        pIY->Release();
     }
 }
 
-
-
-
-
-// Клиент
 int main() {
 
-    setlocale(LC_ALL, "Russian");
-    cout << "Hello, world!" << endl;
+    std::cout << "Hello, World!" << std::endl;
 
     HRESULT hr;
 
-    cout << "Client: get pointer to IUnknown" << endl;
-    IUnknown* pIUnkonwn = CreateInstance();
+    std::cout << "Client: get pointer to IUnknown" << std::endl;
+    IUnknown* pIUnknown = CreateInstance();
 
-    cout << "\nClient: get pointer to IX" << endl;
+    std::cout << "\nClient: get pointer to IX" << std::endl;
     IX* pIX = NULL;
-    hr = pIUnkonwn->QueryInterface(IID_IX, (void**)&pIX);
+    hr = pIUnknown->QueryInterface(IID_IX, (void**)&pIX);
     if (SUCCEEDED(hr)) {
-        cout << "Client: IX received successfully" << endl;
-        pIX->Fx(); // Используем интерфейс IX
-        pIX->Release();
+        std::cout << "Client: IX received successfully" << std::endl;
+        pIX->Fx();
     }
 
-    cout << "\nClient: get pointer to IY" << endl;
+    std::cout << "\nClient: get pointer to IY" << std::endl;
     IY* pIY = NULL;
-    hr = pIUnkonwn->QueryInterface(IID_IY, (void**)&pIY);
+    hr = pIUnknown->QueryInterface(IID_IY, (void**)&pIY);
     if (SUCCEEDED(hr)) {
-        cout << "Client: IY received successfully" << endl;
-        pIY->Fy(); // Используем интерфейс IY
-        pIY->Release();
-    };
+        std::cout << "Client: IY received successfully" << std::endl;
+        pIY->Fy();
+    }
 
-    cout << "\nClient: Get unsupported interface" << endl;
+    std::cout << "\nClient: Get unsupported interface" << std::endl;
     IZ* pIZ = NULL;
-    hr = pIUnkonwn->QueryInterface(IID_IZ, (void**)&pIZ);
+    hr = pIUnknown->QueryInterface(IID_IZ, (void**)&pIZ);
     if (SUCCEEDED(hr)) {
-        cout << "Client: interface IZ get succesfully" << endl;
+        std::cout << "Client: interface IZ get successfully" << std::endl;
         pIZ->Release();
     }
     else {
-        cout << "Client: Can not get interface IZ" << endl;
+        std::cout << "Client: Can not get interface IZ" << std::endl;
     }
-    cout << "\nКлиент: получаем указатель на IY через IX" << endl;
-    IY* pIYfromIX = NULL;
-    hr = pIX->QueryInterface(IID_IY, (void**)&pIYfromIX);
+
+    std::cout << "\nClient: Get pointer to IY from IX" << std::endl;
+    IY* pIYfromIx = NULL;
+    hr = pIX->QueryInterface(IID_IY, (void**)&pIYfromIx);
     if (SUCCEEDED(hr)) {
-        cout << "Клиент: указатель на IY успешно получен" << endl;
-        pIYfromIX->Fy();
-        pIYfromIX->Release();
+        std::cout << "Client: IY received successfully" << std::endl;
+        pIYfromIx->Fy();
+        pIYfromIx->Release();
     }
     else {
-        cout << "Клиент: невозможно получить указатель на IY через IX" << endl;
-    };
+        std::cout << "Client: Can not get IY from IX" << std::endl;
+    }
 
-    cout << "\nКлиент: получаем указатель на IUnknown через IY" << endl;
+    std::cout << "\nClient: Get pointer to IUnknown from IY" << std::endl;
     IUnknown* pIUnknownFromIY = NULL;
     hr = pIY->QueryInterface(IID_IUnknown1, (void**)&pIUnknownFromIY);
     if (SUCCEEDED(hr)) {
-        cout << "Равны ли два указателя?" << endl;
-        if (pIUnknownFromIY == pIUnkonwn) {
-            cout << "ДА" << endl;
-            pIUnknownFromIY->Release();
+        std::cout << "Two pointers are equal?" << std::endl;
+        if (pIUnknownFromIY == pIUnknown) {
+            std::cout << "YES" << std::endl;
         }
         else {
-            cout << "HET" << endl;
+            std::cout << "NO" << std::endl;
         }
-    };
+        pIUnknownFromIY->Release();
+    }
 
-
-    // Тест функции f
-    cout << "\nТест f()" << endl;
+    std::cout << "\nTest f()" << std::endl;
     try {
-        f(pIX);
-        cout << "f() выполнена успешно" << endl;
+        if (pIX) f(pIX);
+        std::cout << "f() successfully completed" << std::endl;
     }
     catch (...) {
-        cout << "Ошибка при выполнении f()" << endl;
+        std::cout << "Error in f()" << std::endl;
     }
 
-    // Тест функции f2
-    cout << "\nТест f2()" << endl;
+    std::cout << "\nTest f2()" << std::endl;
     try {
-        f2(pIX);
-        cout << "f2() выполнена успешно" << endl;
+        if (pIX) f2(pIX);
+        std::cout << "f2() successfully completed" << std::endl;
     }
     catch (...) {
-        cout << "Ошибка при выполнении f2()" << endl;
+        std::cout << "Error in f2()" << std::endl;
     }
 
-    // Тест функции f3
-    cout << "\nТест f3()" << endl;
+    std::cout << "\nTest f3()" << std::endl;
     try {
-        f3(pIX);
-        cout << "f3() выполнена успешно" << endl;
+        if (pIX) f3(pIX);
+        std::cout << "f3() successfully completed" << std::endl;
     }
     catch (...) {
-        cout << "Ошибка при выполнении f3()" << endl;
+        std::cout << "Error in f3()" << std::endl;
     }
 
-    // Тест функции SameComponents
-    cout << "\nТест SameComponents()" << endl;
+    std::cout << "\nTest SameComponents()" << std::endl;
     bool result = SameComponents(pIX, pIY);
-    cout << "Результат сравнения компонентов: " 
-        << (result ? "указатели совпадают" : "указатели различаются") 
-        << endl;
+    std::cout << "Result of comparison: " << (result ? "pointers match" : "pointers are different") << std::endl;
 
-    // Очистка памяти после тестов
     if (pIX != NULL) pIX->Release();
     if (pIY != NULL) pIY->Release();
 
-    //  Удаление компонента
-    delete pIUnkonwn;
+    pIUnknown->Release();
 
     return 0;
-
 }
