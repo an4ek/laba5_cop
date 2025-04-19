@@ -86,7 +86,7 @@ BOOL SameComponents(IX* pIX, IY* pIY) {
     pI1->Release();
     pI2->Release();
 
-    return result;
+    return result; 
 }
 
 void f(IX* pIX) {
